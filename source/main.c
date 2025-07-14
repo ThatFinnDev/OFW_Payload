@@ -397,68 +397,6 @@ void ipl_main()
 	// Tegra/Horizon configuration goes to 0x80000000+, package2 goes to 0xA9800000, we place our heap in between.
 	heap_init(IPL_HEAP_START);
 
-#ifdef DEBUG_UART_PORT
-	uart_send(DEBUG_UART_PORT, (u8 *)"hekate: Hello!\r\n", 16);
-	uart_wait_idle(DEBUG_UART_PORT, UART_TX_IDLE);
-#endif
 
-	// Set bootloader's default configuration.
-	set_default_configuration();
-
-	// Mount SD Card.
-	h_cfg.errors |= !sd_mount() ? ERR_SD_BOOT_EN : 0;
-
-	// Train DRAM and switch to max frequency.
-	if (minerva_init()) //!TODO: Add Tegra210B01 support to minerva.
-		h_cfg.errors |= ERR_LIBSYS_MTC;
-
-	display_init();
-
-	u32 *fb = display_init_framebuffer_pitch();
-	gfx_init_ctxt(fb, 720, 1280, 720);
-
-	gfx_con_init();
-
-	display_backlight_pwm_init();
-
-	// Overclock BPMP.
-	bpmp_clk_rate_set(h_cfg.t210b01 ? BPMP_CLK_DEFAULT_BOOST : BPMP_CLK_LOWER_BOOST);
-
-	// Load emuMMC configuration from SD.
-	emummc_load_cfg();
-	// Ignore whether emummc is enabled.
-	h_cfg.emummc_force_disable = emu_cfg.sector == 0 && !emu_cfg.path;
-	emu_cfg.enabled = !h_cfg.emummc_force_disable;
-
-	// Grey out emummc option if not present.
-	if (h_cfg.emummc_force_disable)
-	{
-		grey_out_menu_item(&ment_top[1]);
-	}
-
-	// Grey out reboot to RCM option if on Mariko or patched console.
-	if (h_cfg.t210b01 || h_cfg.rcm_patched)
-	{
-		grey_out_menu_item(&ment_top[10]);
-	}
-
-	// Grey out Mariko partial dump option on Erista.
-	if (!h_cfg.t210b01) {
-		grey_out_menu_item(&ment_top[4]);
-	}
-
-	// Grey out reboot to hekate option if no update.bin found.
-	if (f_stat("bootloader/update.bin", NULL))
-	{
-		grey_out_menu_item(&ment_top[7]);
-	}
-
-	minerva_change_freq(FREQ_800);
-
-	while (true)
-		tui_do_menu(&menu_top);
-
-	// Halt BPMP if we managed to get out of execution.
-	while (true)
-		bpmp_halt();
+	power_set_state_ex(&STATE_REBOOT_BYPASS_FUSES);
 }
